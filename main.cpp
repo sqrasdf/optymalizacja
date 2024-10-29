@@ -37,7 +37,7 @@ int main()
 		solution::clear_calls();
 		double a, b, epsilon;
 		epsilon = 0.01;
-		solution C();
+		solution C;
 
 
 		F = fib(-100, 100, epsilon);
