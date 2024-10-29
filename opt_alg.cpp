@@ -1,471 +1,704 @@
 #include"opt_alg.h"
-
-solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, double epsilon, int Nmax, matrix ud1, matrix ud2)
+//#include"matrix.cpp"
+#if LAB_NO>1
+double* expansion(double x0, double d, double alfa, int Nmax, matrix O)//, matrix O
 {
-	try
+	double* p = new double[2];
+	solution X0(x0);
+	solution X1(x0 + d);
+	X0.fit_fun();
+	X1.fit_fun();
+	if (X0.y(0) == X1.y(0))
 	{
-		solution Xopt;
-		while (true)
-		{
-			Xopt = rand_mat(N);
-			for (int i = 0; i < N; ++i)
-				Xopt.x(i) = (ub(i) - lb(i)) * Xopt.x(i) + lb(i);
-			Xopt.fit_fun(ff, ud1, ud2);
-			if (Xopt.y < epsilon)
-			{
-				Xopt.flag = 1;
-				break;
-			}
-			if (solution::f_calls > Nmax)
-			{
-				Xopt.flag = 0;
-				break;
-			}
-		}
-		return Xopt;
+		p[0] = X0.x(0);
+		p[1] = X1.x(0);
+		return p;
 	}
-	catch (string ex_info)
+	if (X1.y(0) > X0.y(0))
 	{
-		throw ("solution MC(...):\n" + ex_info);
-	}
-}
-
-double* expansion(matrix(*ff)(matrix, matrix, matrix), double x0, double d, double alpha, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		// Inicjalizacja
-		double* p = new double[2] { 0, 0 };
-		int i = 0;
-
-		// Punkt pocz�tkowy i punkt nast�pny
-		solution x0_m(x0);
-		solution x1_m;
-
-		x1_m.x = x0_m.x + d;
-
-		// Obliczenie warto�ci funkcji celu w punktach pocz�tkowych
-		//solution sol;
-		x0_m.fit_fun(ff);
-		double	fx0 = m2d(x0_m.y);
-
-		x1_m.fit_fun(ff);
-		double fx1 = m2d(x1_m.y);
-
-		std::cout << "Iteracja: " << i << ", fx0: " << fx0 << ", fx1: " << fx1 << std::endl;
-
-		// Sprawdzenie, czy warto�ci s� r�wne
-		if (fx1 == fx0)
+		d *= -1;
+		X1.x(0) = X0.x(0) + d;
+		X1.fit_fun(X1.x);
+		if (X1.y(0) >= X0.y(0))
 		{
-			p[0] = m2d(x0_m.x);
-			p[1] = m2d(x1_m.x);
+			p[0] = X1.x(0);
+			p[1] = X0.x(0);
 			return p;
 		}
+	}
+	solution X2;
+	int i = 1;
+	while (true)
+	{
+		X2.x(0) = x0 + pow(alfa, i) * d;
+		X2.fit_fun();
+		if (i > Nmax || X0.y(0) <= X2.y(0))
+			break;
+		X0.x = X1.x;
+		X0.fit_fun();
+		X1.x = X2.x;
+		++i;
+	}
+	if (X0.x(0) < X2.x(0))
+	{
+		p[0] = X0.x(0);
+		p[1] = X2.x(0);
+	}
+	else {
+		p[0] = X2.x(0);
+		p[1] = X0.x(0);
+	}
+	return p;
+}
 
-		// Je�eli warto�� funkcji ro�nie, zmie� kierunek d
-		if (fx1 > fx0)
+solution fib(double a, double b, double epsilon, matrix O)
+{
+
+	int n = 2; //(b-a)/epsilon +1
+	int Fib = 0;
+	while (true) {
+		Fib = (1 / sqrt(5)) * (pow(((1 + sqrt(5)) / (2)), n) - pow(((1 - sqrt(5)) / (2)), n));
+		if (Fib > (b - a) / epsilon)
+			break;
+		else
+			n++;
+	}
+	int* F = new int[n] {1, 1};
+	for (int i = 2; i < n; ++i)
+		F[i] = F[i - 2] + F[i - 1];
+	solution A(a), B(b), C, D;
+	double B0 = (double)((F[(n - 2)]) / (double)(F[(n - 1)]));
+	C.x = A.x(0) - B0 * (B.x(0) - A.x(0));
+	D.x = A.x(0) + B.x(0) - C.x(0);
+	C.fit_fun();
+	D.fit_fun();
+	for (int i = 0; i <= n - 3; ++i)
+	{
+		cout << "Fib iteracja i: " << i << "  b-a= " << B.x(0) - A.x(0) << endl;
+		if (C.y(0) < D.y(0))
 		{
-			d = -d;
-			x1_m = m2d(x0_m.x) + d;
-			fx1 = m2d(x1_m.y);
-
-			// Sprawd� ponownie, je�li warto�ci nadal rosn�
-			if (fx1 >= fx0)
-			{
-				p[0] = m2d(x1_m.x);
-				p[1] = m2d(x0_m.x) - d;
-				return p;
-			}
+			B.x = D.x(0);
 		}
+		else {
+			A.x = C.x(0);
+		}
+		B0 = (double)((F[n - i - 2]) / (double)(F[n - i - 1]));
+		C.x = B.x(0) - B0 * (B.x(0) - A.x(0));
+		D.x = A.x(0) + B.x(0) - C.x(0);
+		C.fit_fun();
+		D.fit_fun();
+	}
+	//cout << "C.x znalezione: " << C.x(0) << endl;
+	//cout << "C.y znalezione: " << C.y << endl;
+	cout << "Fib iteracja koncowa: " << "  b-a= " << B.x(0) - A.x(0) << endl;
+	return C;
+}
 
-		solution xi_m;
-		double fxi;
-		solution xi1_m;
-		double fxi1;
+solution lag(double a, double b, double epsilon, double gamma, int Nmax, matrix O)
+{
+	solution A(a), B(b), C, D, D0;
+	C.x = (a + b) / 2;
+	A.fit_fun();
+	B.fit_fun();
+	C.fit_fun();
+	double l, m;
+	int i = 0;
+	while (true)
+	{
+		cout << "Lag iteracja i: " << i << "  b-a= " << B.x(0) - A.x(0) << endl;
+		/*cout << "A.x znalezione: " << A.x(0) << "  y: " << A.y(0) << endl;
+		cout << "B.x znalezione: " << B.x(0) << "  y: " << B.y(0) << endl;
+		cout << "C.x znalezione: " << C.x(0) << "  y: " << C.y(0) << endl;*/
+		l = A.y(0) * (pow(B.x(0), 2) - pow(C.x(0), 2)) + B.y(0) * (pow(C.x(0), 2) - pow(A.x(0), 2)) + C.y(0) * (pow(A.x(0), 2) - pow(B.x(0), 2));
+		m = A.y(0) * (B.x(0) - C.x(0)) + B.y(0) * (C.x(0) - A.x(0)) + C.y(0) * (A.x(0) - B.x(0));
 
-		// Powtarzaj ekspansj� a� do osi�gni�cia maksymalnej liczby iteracji lub znalezienia minimum
-		do 
+
+		if (m <= 0)
 		{
-			if (solution::f_calls >= Nmax) 
+			C.x = NAN;
+			C.y = NAN;
+			return C;
+		}
+		D0.x = D.x;
+		D.x = l / (2 * m);
+		D.fit_fun();
+		//cout << "D.x znalezione: " << D.x(0) << "  y: " << D.y(0) << endl;
+		if (A.x(0) < D.x(0) && D.x(0) < C.x(0))
+		{
+			if (D.y(0) < C.y(0))
 			{
-				throw std::runtime_error("Przekroczono maksymaln� liczb� wywo�a� funkcji");
+				B.x = C.x;
+				C.x = D.x;
+				B.fit_fun();
+				C.fit_fun();
 			}
-
-			xi_m.x = x0_m.x + pow(alpha, i) * d;
-			xi_m.fit_fun(ff);
-			fxi = m2d(xi_m.y);
-
-			i = i+1;
-			
-			xi1_m.x = x0_m.x + pow(alpha, i) * d;
-			xi1_m.fit_fun(ff);
-			fxi1 = m2d(xi1_m.y);
-
-			std::cout << "Iteracja: " << i << ", xi: " << xi_m.x << ", fx: " << fxi << ", xi+1: " << xi1_m.x << ", fx1: " << fxi1 << std::endl;
-
-		} while (fxi > fxi1);
-
-		// Obs�uguje znalezione minimum
-		if (d > 0)
+			else
+				A.x = D.x;
+			A.fit_fun();
+		}
+		else if (C.x(0) < D.x(0) && D.x(0) < B.x(0))
 		{
-			p[0] = m2d(x0_m.x) + pow(alpha, i - 2.0) * d;
-			p[1] = m2d(x0_m.x) + pow(alpha, i) * d;
+			if (D.y(0) < C.y(0))
+			{
+				A.x = C.x;
+				C.x = D.x;
+				A.fit_fun();
+				C.fit_fun();
+			}
+			else
+				B.x = D.x;
+			B.fit_fun();
 		}
 		else
 		{
-			p[0] = m2d(x0_m.x) + pow(alpha, i) * d;
-			p[1] = m2d(x0_m.x) + pow(alpha, i - 2.0) * d;
+			C.x = NAN;
+			C.y = NAN;
+			return C;
 		}
-		return p;
+
+		if (i > Nmax || B.x(0) - A.x(0) < epsilon || abs(D.x(0) - D0.x(0)) <= gamma)
+		{
+
+			break;
+		}
+
+
+		i++;
 	}
-	catch (const std::exception& ex)
+	cout << "Lag iteracja koncowa: " << "  b-a= " << B.x(0) - A.x(0) << endl;
+	//cout << "Lag C.x znalezione: " << C.x(0) << "  y: " << C.y(0) << endl;
+	return C;
+}
+
+#endif
+#if LAB_NO>2
+solution HJ(matrix x0, double s, double alfa, double epsilon, int Nmax, matrix O)
+{
+
+	solution XB, XB_old, X;
+	XB.x = x0;
+	XB.fit_fun();
+	while (true)
 	{
-		throw std::runtime_error("double* expansion(...): " + std::string(ex.what()));
-	}
-	catch (...)
-	{
-		throw std::runtime_error("double* expansion(...): Nieznany b��d.");
+		X = HJ_trial(XB, s);
+		if (X.y(0) < XB.y(0))
+		{
+			while (true)
+			{
+				cout << "Krok HJ" << XB.x(0) << " " << XB.x(1) << endl;
+				XB_old = XB;
+				XB = X;
+				//cout << " XB.x1: " << XB.x(0) << " XB.x1: " << XB.x(1) << endl;
+				X.x = 2.0 * XB.x - XB_old.x;
+				//cout << "NEW XB.x1: " << XB.x(0) << " XB.x1: " << XB.x(1) << endl;
+				//X.x =  XB.x - XB_old.x;
+				X.fit_fun();
+				X = HJ_trial(X, s);
+				if (X.y(0) >= XB.y(0))
+					break;
+				if (solution::f_calls > Nmax)
+					return XB;
+			}
+		}
+		else
+			s *= alfa;
+		if (s< epsilon || solution::f_calls>Nmax)
+			return XB;
 	}
 }
 
-const double PHI = (1 + sqrt(5)) / 2; // Z�oty podzia�
-
-solution fib(matrix(*ff)(matrix, matrix, matrix), double a, double b, double epsilon, matrix ud1, matrix ud2)
+solution HJ_trial(solution XB, double s, matrix O)
 {
-	try
+	int* n = get_size(XB.x);
+	matrix D(n[0], n[0]);
+	for (int i = 0; i < n[0]; i++)
+		D(i, i) = 1;
+	solution X;
+	for (int i = 0; i < n[0]; ++i)
 	{
-		solution Xopt;
-		// Sprawdzamy, czy epsilon jest wi�ksze od 0
-		if (epsilon <= 0)
-			throw std::invalid_argument("Epsilon must be greater than 0.");
-
-		// 1: Znajd� najmniejsz� liczb� k spe�niaj�c� nier�wno�� ?^k > (b - a) / ?
-		int k = 0;
-		while (pow(PHI, k) <= (b - a) / epsilon)
+		X.x = XB.x + s * D[i];
+		X.fit_fun();
+		if (X.y < XB.y)
+			XB = X;
+		else
 		{
-			k++;
+			X.x = XB.x - s * D[i];
+			X.fit_fun();
+			if (X.y < XB.y)
+				XB = X;
 		}
+	}
+	return XB;
+}
 
-		// 2: Inicjalizacja
-		double a_i = a;
-		double b_i = b;
-		double c_i = b_i - (b_i - a_i) / PHI; // c(0)
-		double d_i = a_i + (b_i - c_i);       // d(0)
+solution Rosen(matrix x0, matrix s0, double alfa, double beta, double epsilon, int Nmax, matrix O)
+{
+	int* n = get_size(x0);
+	matrix l(n[0], 1), p(n[0], 1), s(s0);
+	matrix D(n[0], n[0]);
+	for (int i = 0; i < n[0]; i++)
+		D(i, i) = 1;
 
-		for (int i = 0; i < k - 3; ++i)
+	solution X, Xt;
+	X.x = x0;
+	X.fit_fun();
+	while (true)
+	{
+		for (int i = 0; i < n[0]; ++i)
 		{
-			// Obliczamy warto�ci funkcji w punktach c(i) i d(i)
-			matrix f_c_i = ff(matrix(c_i), ud1, ud2);
-			matrix f_d_i = ff(matrix(d_i), ud1, ud2);
-
-			// Por�wnujemy f(c(i)) z f(d(i))
-			if (m2d(f_c_i) < m2d(f_d_i))
+			cout << "Krok Ros" << X.x(0) << " " << X.x(1) << endl;
+			Xt.x = X.x + s(i) * D[i];
+			Xt.fit_fun();
+			if (Xt.y(0) < X.y(0))
 			{
-				// Aktualizujemy b(i+1), a(i+1) zostawiamy
-				b_i = d_i;
+				X = Xt;
+				l(i) += s(i);
+				s(i) *= alfa;
 			}
 			else
 			{
-				// Aktualizujemy a(i+1), b(i+1) zostawiamy
-				a_i = c_i;
+				p(i) = p(i) + 1;
+				s(i) *= -beta;
 			}
-			c_i = b_i - (b_i - a_i) / PHI;
-			d_i = a_i + (b_i - c_i);
 		}
-
-		// Obliczamy warto�� funkcji celu w punkcie c(i+1) i aktualizujemy Xopt
-		matrix f_opt = ff(matrix(c_i), ud1, ud2);
-		Xopt = solution(c_i);  // Przypisujemy wsp�rz�dne
-		Xopt.y = f_opt;         // Przypisujemy warto�� funkcji celu
-
-		return Xopt;
+		bool change = true;
+		for (int i = 0; i < n[0]; ++i)
+			if (p(i) == 0 || l(i) == 0)
+			{
+				change = false;
+				break;
+			}
+		if (change)
+		{
+			matrix Q(n[0], n[0]), v(n[0], 1);
+			for (int i = 0; i < n[0]; ++i)
+				for (int j = 0; j <= i; ++j)
+					Q(i, j) = l(i);
+			Q = D * Q;
+			v = Q[0] / norm(Q[0]);
+			D = set_col(D, v, 0);
+			for (int i = 1; i < n[0]; ++i)
+			{
+				matrix temp(n[0], 1);
+				for (int j = 0; j < i; ++j)
+					temp = temp + (trans(Q[i]) * D[j]) * D[j];
+				v = Q[i] - temp;
+				D = set_col(D, v, i);
+			}
+			s = s0;
+			l = matrix(n[0], 1);
+			p = matrix(n[0], 1);
+		}
+		double max_s = abs(s(0));
+		for (int i = 1; i < n[0]; ++i)
+			if (max_s < abs(s(i)))
+				max_s = abs(s(i));
+		if (max_s < epsilon || solution::f_calls > Nmax)
+			return X;
 	}
-	catch (string ex_info)
+}
+#endif
+#if LAB_NO>3
+solution pen(matrix x0, double c0, double dc, double epsilon, int Nmax, matrix O)
+{
+	double alfa = 1, beta = 0.5, gama = 2, delta = 0.5, s = 0.5;
+	matrix A(new double[2]{ c0,O(0) }, 2);
+	solution X, X1;
+	X.x = x0;
+	while (true)
 	{
-		throw ("solution fib(...):\n" + ex_info);
+		X1 = sym_NM(X.x, s, alfa, beta, gama, delta, epsilon, Nmax, A);
+		if (A(0) < epsilon || solution::f_calls > Nmax || A(0) > 1 / epsilon)
+			return X1;
+		A(0) *= dc;
+		X = X1;
 	}
-
 }
 
-
-solution lag(matrix(*ff)(matrix, matrix, matrix), double a, double b, double epsilon, double gamma, int Nmax, matrix ud1, matrix ud2)
+solution sym_NM(matrix x0, double s, double alfa, double beta, double gama, double delta, double epsilon, int Nmax, matrix O)
 {
-	try
+	/**/
+	int* n = get_size(x0);
+	matrix D(n[0], n[0]);
+	for (int i = 0; i < n[0]; i++)
+		D(i, i) = 1;
+
+
+	int N = n[0] + 1;
+	solution* S = new solution[N];
+	S[0].x = x0;
+	S[0].fit_fun(O);
+	for (int i = 1; i < N; ++i)
 	{
-		// Sprawdzamy, czy epsilon i gamma s� wi�ksze od 0
-		if (epsilon <= 0)
-			throw std::invalid_argument("Epsilon must be greater than 0.");
-		if (gamma <= 0)
-			throw std::invalid_argument("Gamma must be greater than 0.");
-
-		solution Xopt;
-		int i = 0;
-		double ai = a;
-		double bi = b;
-		double ci = (a + b) / 2.0; // �rodek 
-		double di = 0;
-		double l, m;
-		double d0;
-
-		solution sol1, sol2, sol3, sol4;
-
-		// Log pocz�tkowych warto�ci
-		std::cout << "Starting optimization with a = " << a << ", b = " << b << ", epsilon = " << epsilon << ", gamma = " << gamma << ", Nmax = " << Nmax << std::endl;
-
-		do {
-			d0 = di;
-			// Wywo�anie funkcji celu dla ai, bi, ci
-			sol1.x = ai;
-			sol1.fit_fun(ff);
-			double fa = m2d(sol1.y);
-			std::cout << "Iteration " << i << ": fa = f(" << ai << ") = " << fa << std::endl;
-
-			sol2.x = bi;
-			sol2.fit_fun(ff);
-			double fb = m2d(sol2.y);
-			std::cout << "Iteration " << i << ": fb = f(" << bi << ") = " << fb << std::endl;
-
-			sol3.x = ci;
-			sol3.fit_fun(ff);
-			double fc = m2d(sol3.y);
-			std::cout << "Iteration " << i << ": fc = f(" << ci << ") = " << fc << std::endl;
-
-			// Obliczanie l i m
-			l = fa * (pow(bi, 2) - pow(ci, 2)) +
-				fb * (pow(ci, 2) - pow(ai, 2)) +
-				fc * (pow(ai, 2) - pow(bi, 2));
-
-			m = fa * (bi - ci) +
-				fb * (ci - ai) +
-				fc * (ai - bi);
-
-			std::cout << "Iteration " << i << ": l = " << l << ", m = " << m << std::endl;
-
-			// Sprawdzenie warunku b��du
-			if (m <= 0) {
-				std::cerr << "Iteration " << i << ": Error, m <= 0 (m = " << m << "). Aborting." << std::endl;
-				throw std::runtime_error("Division by zero or negative denominator error");
+		S[i].x = S[0].x + s;
+		S[i].fit_fun(O);
+	}
+	solution p_o, p_e, p_z;
+	matrix p_sr;
+	int i_min, i_max;
+	while (true)
+	{
+		i_min = 0;
+		i_max = 0;
+		for (int i = 1; i < N; ++i)
+		{
+			if (S[i].y <= S[i_min].y)
+				i_min = i;
+			if (S[i].y >= S[i_max].y)
+				i_max = i;
+		}
+		p_sr = matrix(n[0], 1);
+		for (int i = 0; i < N; ++i)
+			if (i != i_max)
+				p_sr = p_sr + S[i].x;
+		p_sr = p_sr / N;
+		p_o.x = p_sr + alfa * (p_sr - S[i_max].x);
+		p_o.fit_fun(O);
+		if (S[i_min].y <= p_o.y && S[i_max].y > p_o.y)
+			S[i_max] = p_o;
+		else if (S[i_min].y > p_o.y)
+		{
+			p_e.x = p_sr + gama * (p_o.x - p_sr);
+			p_e.fit_fun(O);
+			if (p_e.y < p_o.y)
+				S[i_max] = p_e;
+			else
+				S[i_max] = p_o;
+		}
+		else
+		{
+			p_z.x = p_sr + beta * (S[i_max].x - p_sr);
+			p_z.fit_fun(O);
+			if (p_z.y < S[i_max].y)
+				S[i_max] = p_z;
+			else
+			{
+				for (int i = 0; i < N; ++i)
+					if (i != i_min)
+					{
+						S[i].x = delta * (S[i].x + S[i_min].x);
+						S[i].fit_fun(O);
+					}
 			}
+		}
+		double max_s = norm(S[0].x - S[i_min].x);
+		for (int i = 1; i < N; ++i)
+			if (max_s < norm(S[i].x - S[i_min].x))
+				max_s = norm(S[i].x - S[i_min].x);
+		if (solution::f_calls > Nmax || max_s < epsilon)
+			return S[i_min];
+	}
+}
+#endif
+#if LAB_NO>4
+solution SD(matrix x0, double h0, double epsilon, int Nmax, matrix O)
+{
+	int* n = get_size(x0);
+	solution X, X1;
+	X.x = x0;
+	matrix d(n[0], 1), P(n[0], 2), limits = O;
+	solution h;
+	double b;
+	while (true)
+	{
+		X.grad();
+		d = -X.g;
+		P = set_col(P, X.x, 0);
+		P = set_col(P, d, 1);
+		if (h0 < 0)
+		{
+			b = compute_b(X.x, d, limits);
+			h = golden(0, b, epsilon, Nmax, P);
+			X1.x = X.x + h.x * d;
+		}
+		else
+			X1.x = X.x + h0 * d;
+		if (norm(X1.x - X.x) < epsilon ||
+			solution::g_calls > Nmax ||
+			solution::f_calls > Nmax)
+		{
+			X1.fit_fun();
+			return X1;
+		}
+		X = X1;
+	}
+}
 
-			di = 0.5 * l / m;
-			std::cout << "Iteration " << i << ": di = " << di << std::endl;
+solution CG(matrix x0, double h0, double epsilon, int Nmax, matrix O)
+{
+	int* n = get_size(x0);
+	solution X, X1;
+	X.x = x0;
+	matrix d(n[0], 1), P(n[0], 2), limits = O;
+	solution h;
+	double b, beta;
+	X.grad();
+	d = -X.g;
+	while (true)
+	{
+		P = set_col(P, X.x, 0);
+		P = set_col(P, d, 1);
+		if (h0 < 0)
+		{
+			b = compute_b(X.x, d, limits);
+			h = golden(0, b, epsilon, Nmax, P);
+			X1.x = X.x + h.x * d;
+		}
+		else
+			X1.x = X.x + h0 * d;
+		if (norm(X1.x - X.x) < epsilon ||
+			solution::g_calls > Nmax ||
+			solution::f_calls > Nmax)
+		{
+			X1.fit_fun();
+			return X1;
+		}
+		X1.grad();
+		beta = pow(norm(X1.g), 2) / pow(norm(X.g), 2);
+		d = -X1.g + beta * d;
+		X = X1;
+	}
+}
 
-			// Wywo�anie funkcji celu dla di
-			sol4.x = di;
-			sol4.fit_fun(ff);
-			double fd = m2d(sol4.y);
-			std::cout << "Iteration " << i << ": fd = f(" << di << ") = " << fd << std::endl;
+solution Newton(matrix x0, double h0, double epsilon, int Nmax, matrix O)
+{
+	int* n = get_size(x0);
+	solution X, X1;
+	X.x = x0;
+	matrix d(n[0], 1), P(n[0], 2), limits = O;
+	solution h;
+	double b;
+	while (true)
+	{
+		X.grad();
+		X.hess();
+		d = -inv(X.H) * X.g;
+		P = set_col(P, X.x, 0);
+		P = set_col(P, d, 1);
+		if (h0 < 0)
+		{
+			b = compute_b(X.x, d, limits);
+			h = golden(0, b, epsilon, Nmax, P);
+			X1.x = X.x + h.x * d;
+		}
+		else
+			X1.x = X.x + h0 * d;
+		if (norm(X1.x - X.x) < epsilon ||
+			solution::g_calls > Nmax ||
+			solution::f_calls > Nmax ||
+			det(X.H) == 0)
+		{
+			X1.fit_fun();
+			return X1;
+		}
+		X = X1;
+	}
+}
 
-			// Aktualizacja przedzia�u
-			if (ai < di && di < ci) {
-				if (fd < fc) {
-					std::cout << "AIteration " << i << ": Updating (ai, ci, bi) to (" << ai << ", " << di << ", " << ci << ")" << std::endl;
-					ci = di;
-					bi = ci;
+solution golden(double a, double b, double epsilon, int Nmax, matrix O)
+{
+	double alfa = (sqrt(5) - 1) / 2;
+	solution A, B, C, D;
+	A.x = a;
+	B.x = b;
+	C.x = B.x - alfa * (B.x - A.x);
+	C.fit_fun(O);
+	D.x = A.x + alfa * (B.x - A.x);
+	D.fit_fun(O);
+	while (true)
+	{
+		if (C.y < D.y)
+		{
+			B = D;
+			D = C;
+			C.x = B.x - alfa * (B.x - A.x);
+			C.fit_fun(O);
+		}
+		else
+		{
+			A = C;
+			C = D;
+			D.x = A.x + alfa * (B.x - A.x);
+			D.fit_fun(O);
+		}
+		if (solution::f_calls > Nmax || B.x - A.x < epsilon)
+		{
+			A.x = (A.x + B.x) / 2.0;
+			A.fit_fun(O);
+			return A;
+		}
+	}
+}
+
+double compute_b(matrix x, matrix d, matrix limits)
+{
+	int* n = get_size(x);
+	double b = 1e9, bi;
+	for (int i = 0; i < n[0]; ++i)
+	{
+		if (d(i) == 0)
+			bi = 1e9;
+		else if (d(i) > 0)
+			bi = (limits(i, 1) - x(i)) / d(i);
+		else
+			bi = (limits(i, 0) - x(i)) / d(i);
+		if (b != bi)
+			b = bi;
+	}
+	return b;
+}
+#endif
+#if LAB_NO>5
+solution Powell(matrix x0, double epsilon, int Nmax, matrix O)
+{
+	int* n = get_size(x0);
+	matrix D = ident_mat(n[0]), A(n[0], 3), limits(n[0], 2);
+	limits = set_col(limits, O[0], 0);
+	limits = set_col(limits, O[1], 1);
+	A(0, 2) = O(0, 2);
+	solution X, P, h;
+	X.x = x0;
+	double* ab;
+	while (true)
+	{
+		P = ? ;
+		for (int i = 0; i < ? ; ++i)
+		{
+			A = set_col(A, P.x, 0);
+			A = set_col(A, D[i], 1);
+			ab = compute_ab(? , ? , limits);
+			h = golden(? , ? , epsilon, Nmax, A);
+			P.x = ? ;
+		}
+		if (? )
+		{
+			P.fit_fun();
+			return P;
+		}
+		for (int i = 0; i < n[0] - 1; ++i)
+			D = ? ;
+		D = ? ;
+		A = set_col(A, P.x, 0);
+		A = set_col(A, D[n[0] - 1], 1);
+		ab = compute_ab(? , ? , limits);
+		h = golden(? , ? , epsilon, Nmax, A);
+		X.x = ? ;
+	}
+}
+
+double* compute_ab(matrix x, matrix d, matrix limits)
+{
+	int* n = get_size(x);
+	double* ab = new double[2]{ -1e9,1e9 };
+	double ai, bi;
+	for (int i = 0; i < n[0]; ++i)
+	{
+		if (d(i) == 0)
+		{
+			ai = ? ;
+			bi = ? ;
+		}
+		else if (d(i) > 0)
+		{
+			ai = ? ;
+			bi = ? ;
+		}
+		else
+		{
+			ai = ? ;
+			bi = ? ;
+		}
+		if (? )
+			ab[0] = ai;
+		if (? )
+			ab[1] = bi;
+	}
+	return ab;
+}
+#endif
+#if LAB_NO>6
+solution EA(int N, matrix limits, double epsilon, int Nmax, matrix O)
+{
+	int mi = 20, lambda = 40;
+	solution* P = new solution[mi + lambda];
+	solution* Pm = new solution[mi];
+	random_device rd;
+	default_random_engine gen;
+	gen.seed(static_cast<unsigned int>(chrono::system_clock::now().time_since_epoch().count()));
+	normal_distribution<double> distr(0.0, 1.0);
+	matrix IFF(mi, 1), temp(N, 2);
+	double r, s, s_IFF;
+	double tau = ? , tau1 = ? ;
+	int j_min;
+	for (int i = 0; i < ? ; ++i)
+	{
+		P[i].x = matrix(N, 2);
+		for (int j = 0; j < N; ++j)
+		{
+			P[i].x(j, 0) = ? ;
+			P[i].x(j, 1) = ? ;
+		}
+		P[i].fit_fun();
+		if (P[i].y < epsilon)
+			return P[i];
+	}
+	while (true)
+	{
+		s_IFF = 0;
+		for (int i = 0; i < ? ; ++i)
+		{
+			IFF(i) = 1 / P[i].y(0);
+			s_IFF += IFF(i);
+		}
+		for (int i = 0; i < ? ; ++i)
+		{
+			r = ? ;
+			s = 0;
+			for (int j = 0; j < ? ; ++j)
+			{
+				s += ? ;
+				if (? )
+				{
+					P[mi + i] = ? ;
+					break;
 				}
-				else {
-					std::cout << "BIteration " << i << ": Updating (ai, ci, bi) to (" << di << ", " << ci << ", " << bi << ")" << std::endl;
-					ai = di;
-				}
 			}
-			else if (ci < di && di < bi) {
-				if (fd < fc) {
-					std::cout << "CIteration " << i << ": Updating (ai, ci, bi) to (" << ci << ", " << di << ", " << bi << ")" << std::endl;
-					ai = ci;
-					ci = di;
-				}
-				else {
-					std::cout << "DIteration " << i << ": Updating (ai, ci, bi) to (" << ai << ", " << ci << ", " << di << ")" << std::endl;
-					bi = di;
-				}
+		}
+		for (int i = 0; i < ? ; ++i)
+		{
+			r = distr(gen);
+			for (int j = 0; j < N; ++j)
+			{
+				P[mi + i].x(j, 1) *= ? ;
+				P[mi + i].x(j, 0) += ? ;
 			}
-			else {
-				std::cerr << "Iteration " << i << ": Error, di is outside of the search interval [" << ai << ", " << bi << "]" << std::endl;
-				throw std::runtime_error("d(i) is outside of the search interval [a(i), b(i)]");
-			}
-
-			i++;
-
-			// Sprawdzenie maksymalnej liczby wywo�a� funkcji
-			if (solution::f_calls >= Nmax) {
-				std::cerr << "Iteration " << i << ": Error, exceeded maximum number of function calls." << std::endl;
-				throw std::runtime_error("Przekroczono maksymaln� liczb� wywo�a� funkcji");
-			}
-
-		} while ((bi - ai >= epsilon) || (fabs(di - d0) >= gamma));
-
-		std::cout << "Optimization completed. x* = " << di << std::endl;
-		Xopt = di; // Zwracanie optymalnego punktu
-		return Xopt;
-	}
-	catch (const std::exception& ex_info)
-	{
-		std::cerr << "Error in solution lag(...): " << ex_info.what() << std::endl;
-		throw std::runtime_error("solution lag(...): " + std::string(ex_info.what()));
-	}
-}
-
-
-solution HJ(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double alpha, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution HJ(...):\n" + ex_info);
+		}
+		for (int i = 0; i < ? ; i += 2)
+		{
+			r = ? ;
+			temp = P[mi + i].x;
+			P[mi + i].x = ? ;
+			P[mi + i + 1].x = ? ;
+		}
+		for (int i = 0; i < ? ; ++i)
+		{
+			P[mi + i].fit_fun();
+			if (P[mi + i].y < epsilon)
+				return P[mi + i];
+		}
+		for (int i = 0; i < ? ; ++i)
+		{
+			j_min = 0;
+			for (int j = 1; j < ? ; ++j)
+				if (P[j_min].y > P[j].y)
+					j_min = j;
+			Pm[i] = P[j_min];
+			P[j_min].y = 1e10;
+		}
+		for (int i = 0; i < ? ; ++i)
+			P[i] = Pm[i];
+		if (? )
+			return P[0];
 	}
 }
-
-solution HJ_trial(matrix(*ff)(matrix, matrix, matrix), solution XB, double s, matrix ud1, matrix ud2)
-{
-	try
-	{
-		//Tu wpisz kod funkcji
-
-		return XB;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution HJ_trial(...):\n" + ex_info);
-	}
-}
-
-solution Rosen(matrix(*ff)(matrix, matrix, matrix), matrix x0, matrix s0, double alpha, double beta, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution Rosen(...):\n" + ex_info);
-	}
-}
-
-solution pen(matrix(*ff)(matrix, matrix, matrix), matrix x0, double c, double dc, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try {
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution pen(...):\n" + ex_info);
-	}
-}
-
-solution sym_NM(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double alpha, double beta, double gamma, double delta, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution sym_NM(...):\n" + ex_info);
-	}
-}
-
-solution SD(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution SD(...):\n" + ex_info);
-	}
-}
-
-solution CG(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution CG(...):\n" + ex_info);
-	}
-}
-
-solution Newton(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix),
-	matrix(*Hf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution Newton(...):\n" + ex_info);
-	}
-}
-
-solution golden(matrix(*ff)(matrix, matrix, matrix), double a, double b, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution golden(...):\n" + ex_info);
-	}
-}
-
-solution Powell(matrix(*ff)(matrix, matrix, matrix), matrix x0, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution Powell(...):\n" + ex_info);
-	}
-}
-
-solution EA(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, int mi, int lambda, matrix sigma0, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution EA(...):\n" + ex_info);
-	}
-}
+#endif
